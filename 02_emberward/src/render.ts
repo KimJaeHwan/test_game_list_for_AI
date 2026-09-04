@@ -11,7 +11,6 @@ import {
   createReport,
   obstaclesFor,
   sceneWidth,
-  type BossCueKind,
   type GameState,
   type Point,
   type Rune,
@@ -20,6 +19,7 @@ import {
 
 export interface RenderMeta {
   titleMode: boolean;
+  guideMode: boolean;
   titleSelection: number;
   contentSeed: number;
   visualSeed: number;
@@ -323,8 +323,6 @@ function drawActionEffects(
   const runeAge = meta.now - meta.runeEffectStartedAt;
   const attackActive = attackAge >= 0 && attackAge < 480;
   const runeActive = runeAge >= 0 && runeAge < 820;
-  let actionText = '';
-  let actionColor = palette.text;
 
   context.save();
   if (meta.guardActive) {
@@ -351,8 +349,6 @@ function drawActionEffects(
     context.closePath();
     context.globalAlpha = 0.32;
     context.fill();
-    actionText = 'SHIFT · 방어 유지';
-    actionColor = palette.blue;
   }
 
   if (attackActive) {
@@ -371,8 +367,6 @@ function drawActionEffects(
     context.lineTo(x + 49, y - 15);
     context.closePath();
     context.fill();
-    actionText = 'SPACE · 공격';
-    actionColor = palette.gold;
   }
 
   if (runeActive) {
@@ -394,20 +388,8 @@ function drawActionEffects(
     }
     context.globalAlpha = Math.max(0.25, 1 - progress);
     drawRune(context, rune, x, y - 7, 42 + progress * 12, palette.blue);
-    actionText = `1 · ${RUNE_KO[rune]} 룬 발동`;
-    actionColor = palette.blue;
   }
   context.restore();
-
-  if (actionText) {
-    roundedRect(context, x - 86, y - 78, 172, 30, 8);
-    context.fillStyle = '#040a09ed';
-    context.fill();
-    context.strokeStyle = actionColor;
-    context.lineWidth = 2;
-    context.stroke();
-    label(context, actionText, x, y - 63, 12, actionColor, 'center', 900);
-  }
 }
 
 function drawInteractMarker(context: CanvasRenderingContext2D, point: Point, cameraX: number, palette: Palette): void {
@@ -572,52 +554,10 @@ function drawRuneMenu(context: CanvasRenderingContext2D, state: GameState, palet
     label(context, `${RUNE_KO[rune]} 룬`, 355, y, 20, palette.text, 'left', 800);
     if (state.runeSelection === index) label(context, '▶', 675, y, 20, palette.mint, 'right', 900);
   });
-  label(context, '장착한 룬은 보스전에서 숫자 1로 발동합니다', 480, 458, 14, palette.gold, 'center', 800);
-  label(context, '↑ ↓ 선택   ENTER 장착', 480, 486, 14, palette.muted, 'center', 700);
+  label(context, '선택한 룬을 기억하세요', 480, 478, 14, palette.muted, 'center', 700);
 }
 
-function cueLabel(kind: BossCueKind): string {
-  if (kind === 'cone') return '부채꼴 위험';
-  if (kind === 'wave') return '원형 파동';
-  if (kind === 'open') return '갑옷 개방';
-  return '룬 공명';
-}
-
-function cueActionLabel(kind: BossCueKind): string {
-  if (kind === 'cone') return '← →  위험 범위 밖으로 이동';
-  if (kind === 'wave') return 'SHIFT  파동이 끝날 때까지 유지';
-  if (kind === 'open') return 'SPACE  지금 공격';
-  return '1  장착 룬 발동';
-}
-
-function drawBossControls(context: CanvasRenderingContext2D, state: GameState, meta: RenderMeta, palette: Palette): void {
-  roundedRect(context, 18, 90, 224, 136, 12);
-  context.fillStyle = '#040a09e8';
-  context.fill();
-  context.strokeStyle = palette.line;
-  context.lineWidth = 1;
-  context.stroke();
-  label(context, '전투 조작', 34, 111, 13, palette.muted, 'left', 900);
-  const attackActive = meta.now - meta.attackEffectStartedAt < 480;
-  const runeActive = meta.now - meta.runeEffectStartedAt < 820;
-  const entries = [
-    ['SPACE', '개방 때 공격', attackActive, palette.gold],
-    ['SHIFT', '파동 방어', meta.guardActive, palette.blue],
-    ['1', `${state.equippedRune ? RUNE_KO[state.equippedRune] : '약점'} 룬 사용`, runeActive, palette.blue],
-  ] as const;
-  entries.forEach(([key, description, active, color], index) => {
-    const y = 142 + index * 34;
-    roundedRect(context, 33, y - 12, 58, 24, 6);
-    context.fillStyle = active ? color : '#10201c';
-    context.fill();
-    context.strokeStyle = active ? palette.text : palette.line;
-    context.stroke();
-    label(context, key, 62, y, 10, active ? '#07110f' : palette.mint, 'center', 900);
-    label(context, description, 103, y, 12, active ? color : palette.text, 'left', active ? 850 : 650);
-  });
-}
-
-function drawBoss(context: CanvasRenderingContext2D, state: GameState, meta: RenderMeta, palette: Palette): void {
+function drawBoss(context: CanvasRenderingContext2D, state: GameState, palette: Palette): void {
   const bossX = 480;
   const bossY = 150;
   const cue = state.bossCue;
@@ -664,23 +604,6 @@ function drawBoss(context: CanvasRenderingContext2D, state: GameState, meta: Ren
   context.fillRect(355, 55, barWidth, 13);
   context.fillStyle = palette.danger;
   context.fillRect(355, 55, barWidth * (state.bossHp / state.bossMaxHp), 13);
-  if (cue) {
-    roundedRect(context, 360, 248, 240, 46, 10);
-    context.fillStyle = '#050c0bd9';
-    context.fill();
-    context.strokeStyle = cue.responded && cue.success ? palette.mint : palette.danger;
-    context.stroke();
-    label(context, cueLabel(cue.kind), 480, 272, 18, cue.responded && cue.success ? palette.mint : palette.text, 'center', 900);
-    roundedRect(context, 350, 302, 260, 35, 9);
-    context.fillStyle = '#040a09e8';
-    context.fill();
-    context.strokeStyle = cue.responded && cue.success ? palette.mint : palette.gold;
-    context.stroke();
-    label(context, cue.responded && cue.success ? '대응 성공' : cueActionLabel(cue.kind), 480, 320, 13, cue.responded && cue.success ? palette.mint : palette.gold, 'center', 900);
-  } else {
-    label(context, '다음 움직임 관찰 중…', 480, 272, 15, palette.muted, 'center');
-  }
-  drawBossControls(context, state, meta, palette);
 }
 
 function drawBeacon(context: CanvasRenderingContext2D, state: GameState, palette: Palette): void {
@@ -716,7 +639,7 @@ function drawHud(context: CanvasRenderingContext2D, state: GameState, palette: P
   const remaining = Math.max(0, 180 - state.tick / TICKS_PER_SECOND);
   label(context, `${remaining.toFixed(1)}s`, 925, 25, 17, remaining < 30 ? palette.danger : palette.gold, 'right', 900);
   label(context, `HP ${'◆'.repeat(state.playerHp)}${'◇'.repeat(state.maxHp - state.playerHp)}`, 925, 50, 14, palette.mint, 'right', 800);
-  if (state.equippedRune) label(context, `[1] ${RUNE_KO[state.equippedRune]} 룬 장착`, 750, 50, 13, palette.blue, 'right', 850);
+  if (state.equippedRune) drawRune(context, state.equippedRune, 760, 48, 25, palette.blue);
   if (state.message) {
     roundedRect(context, 205, 466, 550, 48, 10);
     context.fillStyle = '#040a09ed';
@@ -784,26 +707,97 @@ function drawTitle(context: CanvasRenderingContext2D, meta: RenderMeta, palette:
   context.fill();
   context.strokeStyle = palette.line;
   context.stroke();
-  label(context, 'KEYBOARD ONLY', 620, 110, 14, palette.gold, 'left', 900);
-  const controls = [
-    ['방향키', '이동 / 메뉴 선택'],
-    ['ENTER', '대화 / 조사 / 확정'],
-    ['SPACE', '공격'],
-    ['SHIFT', '누르고 방어'],
-    ['1', '약점 룬 사용'],
-    ['ESC', '메뉴 취소'],
+  label(context, 'EVALUATION LOOP', 620, 110, 14, palette.gold, 'left', 900);
+  const phases = [
+    ['01', '화면 단서 관찰'],
+    ['02', '이동과 목표 탐색'],
+    ['03', '문양 순서 기억'],
+    ['04', '룬 선택과 장착'],
+    ['05', '연속 전투 대응'],
+    ['06', '결과와 오류 복구'],
   ];
-  controls.forEach(([key, action], index) => {
+  phases.forEach(([number, description], index) => {
     const y = 160 + index * 47;
     roundedRect(context, 620, y - 15, 74, 30, 6);
     context.fillStyle = '#101f1b';
     context.fill();
     context.strokeStyle = palette.line;
     context.stroke();
-    label(context, key, 657, y, 11, palette.mint, 'center', 900);
-    label(context, action, 714, y, 13, palette.text, 'left', 650);
+    label(context, number, 657, y, 11, palette.mint, 'center', 900);
+    label(context, description, 714, y, 13, palette.text, 'left', 650);
   });
   label(context, '↑↓ 선택 · ←→ 값 변경 · ENTER 시작', 620, 453, 12, palette.muted, 'left', 650);
+}
+
+function drawGuide(context: CanvasRenderingContext2D, meta: RenderMeta, palette: Palette): void {
+  context.fillStyle = palette.void;
+  context.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+  for (let index = 0; index < 24; index += 1) {
+    const x = (index * 127 + meta.visualSeed * 41) % VIEW_WIDTH;
+    const y = (index * 73 + meta.now * 0.012) % VIEW_HEIGHT;
+    context.fillStyle = index % 3 === 0 ? palette.gold : palette.line;
+    context.globalAlpha = 0.16 + (index % 4) * 0.05;
+    context.fillRect(x, y, 2, 12);
+  }
+  context.globalAlpha = 1;
+  label(context, 'MISSION BRIEFING // 1회 표시', 60, 48, 13, palette.mint, 'left', 900);
+  label(context, '작전 조작 규칙', 60, 88, 32, palette.text, 'left', 900);
+  label(context, '임무가 시작되면 조작 힌트는 다시 표시되지 않습니다.', 60, 121, 15, palette.gold, 'left', 750);
+
+  roundedRect(context, 55, 150, 350, 285, 14);
+  context.fillStyle = '#091411ed';
+  context.fill();
+  context.strokeStyle = palette.line;
+  context.stroke();
+  label(context, '기본 조작', 82, 180, 15, palette.muted, 'left', 900);
+  const basics = [
+    ['방향키', '이동 / 메뉴 선택'],
+    ['ENTER', '대화 / 조사 / 확정'],
+    ['ESC', '타이틀로 돌아가기'],
+  ];
+  basics.forEach(([key, description], index) => {
+    const y = 225 + index * 58;
+    roundedRect(context, 82, y - 18, 88, 36, 7);
+    context.fillStyle = '#10231d';
+    context.fill();
+    context.strokeStyle = palette.mint;
+    context.stroke();
+    label(context, key, 126, y, 12, palette.mint, 'center', 900);
+    label(context, description, 192, y, 14, palette.text, 'left', 700);
+  });
+  paragraph(context, '수호자가 알려주는 불씨 문양과 약점 룬, 폐허의 문양 순서를 기억하세요.', 82, 390, 290, 23, palette.muted, 13);
+
+  roundedRect(context, 430, 150, 475, 285, 14);
+  context.fillStyle = '#091411ed';
+  context.fill();
+  context.strokeStyle = palette.line;
+  context.stroke();
+  label(context, '보스의 시각 신호', 457, 180, 15, palette.muted, 'left', 900);
+  const signals = [
+    ['붉은 부채꼴', '방향키 · 범위 밖으로 이동', palette.danger],
+    ['확산 파동', 'SHIFT · 끝까지 유지', palette.blue],
+    ['황금 개방', 'SPACE · 공격', palette.gold],
+    ['룬 문양', '1 · 장착한 룬 발동', palette.blue],
+  ] as const;
+  signals.forEach(([signal, response, color], index) => {
+    const y = 222 + index * 49;
+    context.fillStyle = color;
+    context.beginPath();
+    context.arc(463, y, 7, 0, Math.PI * 2);
+    context.fill();
+    label(context, signal, 482, y, 13, palette.text, 'left', 800);
+    label(context, response, 625, y, 13, color, 'left', 800);
+  });
+  label(context, '룬은 폐허에서 장착한 뒤 사용할 수 있습니다.', 457, 414, 13, palette.muted, 'left', 650);
+
+  roundedRect(context, 250, 465, 460, 48, 10);
+  context.fillStyle = '#17352d';
+  context.fill();
+  context.strokeStyle = palette.mint;
+  context.lineWidth = 2;
+  context.stroke();
+  label(context, 'ENTER · 규칙을 기억하고 임무 시작', 480, 489, 15, palette.text, 'center', 900);
+  label(context, 'ESC · 타이틀', 900, 516, 11, palette.muted, 'right', 700);
 }
 
 function drawResult(context: CanvasRenderingContext2D, state: GameState, meta: RenderMeta, palette: Palette): void {
@@ -854,6 +848,10 @@ export function renderGame(
   meta: RenderMeta,
 ): void {
   const palette = paletteFor(meta.visualSeed);
+  if (meta.guideMode) {
+    drawGuide(context, meta, palette);
+    return;
+  }
   if (meta.titleMode || !state) {
     drawTitle(context, meta, palette);
     return;
@@ -875,7 +873,7 @@ export function renderGame(
   else if (state.scene === 'forest') drawForest(context, state, palette, cameraX);
   else if (state.scene === 'mural') drawMuralRoom(context, state, palette);
   else if (state.scene === 'altar') drawAltars(context, state, palette);
-  else if (state.scene === 'boss') drawBoss(context, state, meta, palette);
+  else if (state.scene === 'boss') drawBoss(context, state, palette);
   else if (state.scene === 'beacon') drawBeacon(context, state, palette);
   drawCharacter(context, state, palette, cameraX);
   drawActionEffects(context, state, meta, palette, cameraX);

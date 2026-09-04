@@ -115,6 +115,7 @@ const cueMeter = document.querySelector<HTMLElement>('#cue-meter');
 const eventValue = document.querySelector<HTMLElement>('#event-value');
 
 let titleMode = true;
+let guideMode = false;
 let titleSelection = 0;
 let resultSelection = 0;
 let contentSeed = 4201;
@@ -178,6 +179,7 @@ function startRun(overrides: Partial<GameConfig> = {}): void {
     ...overrides,
   });
   titleMode = false;
+  guideMode = false;
   resultSelection = 0;
   focusLost = false;
   accumulator = 0;
@@ -195,6 +197,7 @@ function startRun(overrides: Partial<GameConfig> = {}): void {
 
 function backToTitle(): void {
   titleMode = true;
+  guideMode = false;
   game = null;
   heldKeys.clear();
   resetEdges();
@@ -213,7 +216,11 @@ function handleTitleKey(code: string): void {
   else if (code === 'ArrowDown') titleSelection = Math.min(3, titleSelection + 1);
   else if (code === 'ArrowLeft') changeTitleValue(-1);
   else if (code === 'ArrowRight') changeTitleValue(1);
-  else if (code === 'Enter' && titleSelection === 0) startRun();
+  else if (code === 'Enter' && titleSelection === 0) {
+    titleMode = false;
+    guideMode = true;
+    canvas.focus();
+  }
 }
 
 function downloadRun(): void {
@@ -281,6 +288,11 @@ document.addEventListener('keydown', (event) => {
     logKey('focus-restored', event.code, event.key, false);
     heldKeys.clear();
     resetEdges();
+    return;
+  }
+  if (guideMode) {
+    if (event.code === 'Enter') startRun();
+    else if (event.code === 'Escape') backToTitle();
     return;
   }
   if (titleMode) {
@@ -430,7 +442,7 @@ function sceneLabel(scene: GameState['scene'] | undefined): string {
 }
 
 function updateTelemetry(): void {
-  if (titleMode || !game) {
+  if (titleMode || guideMode || !game) {
     if (sceneName) sceneName.textContent = 'READY';
     if (trackValue) trackValue.textContent = track.toUpperCase();
     if (tickValue) tickValue.textContent = '00000';
@@ -467,6 +479,7 @@ function frame(now: number): void {
   updateTelemetry();
   renderGame(context, game, {
     titleMode,
+    guideMode,
     titleSelection,
     contentSeed,
     visualSeed,
