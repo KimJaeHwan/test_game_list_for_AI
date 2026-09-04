@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | 01 | [SHIFT//RESCUE](./01_shift_rescue/) | 화면 판독, 공간 이동, 다단계 계획, 안전 규칙, 오류 복구 |
 | 02 | [EMBERWARD: 마지막 봉화](./02_emberward/) | 연속 영상 추적, 키보드 유지·해제, 기억, 메뉴 조작, 실시간 전투 대응 |
+| 03 | [QUEST ATLAS: 안개항 조사록](./03_quest_atlas/) | 플레이 기반 콘텐츠 발견, 지식 그래프 구조화, 절차 재현, 위키 전이, 환각 억제 |
 
 ## 폴더 규칙
 
@@ -13,8 +14,8 @@
 
 ```text
 01_shift_rescue/
-02_next_game/
-03_next_game/
+02_emberward/
+03_quest_atlas/
 ```
 
 게임별 기능, 평가 목적, 실행 방법은 각 폴더의 `README.md`에서 확인할 수 있습니다.

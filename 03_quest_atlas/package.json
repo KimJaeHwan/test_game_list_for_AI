@@ -1,0 +1,21 @@
+{
+  "name": "quest-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "verify:game": "node --experimental-strip-types scripts/verify-game.mjs",
+    "verify:eval": "node --experimental-strip-types scripts/verify-evaluation.mjs",
+    "verify": "pnpm verify:game && pnpm verify:eval"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.0.13"
+  }
+}

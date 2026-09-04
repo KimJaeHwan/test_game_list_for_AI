@@ -1,0 +1,239 @@
+:root {
+  color-scheme: dark;
+  font-family: "Noto Sans KR", "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  background: #050c10;
+  color: #eef7f4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(47, 113, 105, 0.2), transparent 33rem),
+    radial-gradient(circle at 83% 73%, rgba(25, 79, 88, 0.2), transparent 40rem),
+    linear-gradient(145deg, #050b0f, #07141a 55%, #040b0f);
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(133, 202, 189, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(133, 202, 189, 0.025) 1px, transparent 1px);
+  background-size: 36px 36px;
+  content: "";
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.quest-atlas-root {
+  width: 100%;
+}
+
+.quest-atlas-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  padding: 22px 30px 28px;
+}
+
+.app-masthead {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  width: min(1280px, 100%);
+  margin: 0 auto 14px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #3b7169;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #183f3b, #0b2326);
+  color: #83e7c5;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  box-shadow: inset 0 0 18px rgba(114, 224, 188, 0.08);
+}
+
+.app-masthead h1,
+.app-masthead p,
+.app-footer p {
+  margin: 0;
+}
+
+.app-masthead h1 {
+  margin-top: 2px;
+  color: #eef7f4;
+  font-size: 17px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.app-masthead h1 span {
+  margin-left: 6px;
+  color: #89a39f;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  color: #6eaaa0;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.local-badge {
+  padding: 7px 10px;
+  border: 1px solid rgba(111, 165, 157, 0.34);
+  border-radius: 999px;
+  background: rgba(9, 29, 33, 0.72);
+  color: #84a39f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.canvas-frame {
+  position: relative;
+  width: min(1280px, 100%);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid #263f46;
+  border-radius: 18px;
+  background: #071116;
+  box-shadow:
+    0 26px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(114, 224, 188, 0.035) inset;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  image-rendering: auto;
+  cursor: default;
+}
+
+.focus-ring-label {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(5, 15, 19, 0.86);
+  color: #4c6f6b;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.has-game-focus .canvas-frame {
+  border-color: #4c9787;
+  box-shadow:
+    0 26px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 3px rgba(114, 224, 188, 0.1);
+}
+
+.has-game-focus .focus-ring-label {
+  background: #19463f;
+  color: #9af1d2;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(1280px, 100%);
+  margin: 12px auto 0;
+  color: #607976;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.capture-note {
+  color: #587670;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .quest-atlas-shell {
+    padding: 12px 10px 20px;
+  }
+
+  .app-masthead {
+    gap: 9px;
+    margin-bottom: 10px;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    font-size: 11px;
+  }
+
+  .app-masthead h1 {
+    font-size: 13px;
+  }
+
+  .app-masthead h1 span,
+  .local-badge,
+  .eyebrow,
+  .focus-ring-label {
+    display: none;
+  }
+
+  .canvas-frame {
+    border-radius: 10px;
+  }
+
+  .app-footer {
+    align-items: flex-start;
+    font-size: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-frame,
+  .focus-ring-label {
+    transition: none;
+  }
+}
