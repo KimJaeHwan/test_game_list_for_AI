@@ -131,6 +131,8 @@ let keySequence = 0;
 let keyLog: KeyLog[] = [];
 const heldKeys = new Set<string>();
 const keyFlash = new Map<string, number>();
+let attackEffectStartedAt = Number.NEGATIVE_INFINITY;
+let runeEffectStartedAt = Number.NEGATIVE_INFINITY;
 let edgeInput = emptyInput();
 
 const allowedCodes = new Set([
@@ -184,6 +186,8 @@ function startRun(overrides: Partial<GameConfig> = {}): void {
   resetEdges();
   keyLog = [];
   keySequence = 0;
+  attackEffectStartedAt = Number.NEGATIVE_INFINITY;
+  runeEffectStartedAt = Number.NEGATIVE_INFINITY;
   runStartedAt = performance.now();
   savedRunHash = '';
   canvas.focus();
@@ -286,6 +290,10 @@ document.addEventListener('keydown', (event) => {
   if (game?.scene === 'result') {
     handleResultKey(event.code);
     return;
+  }
+  if (game?.scene === 'boss') {
+    if (event.code === 'Space') attackEffectStartedAt = performance.now();
+    if (event.code === 'Digit1') runeEffectStartedAt = performance.now();
   }
   heldKeys.add(event.code);
   logKey('keydown', event.code, event.key, false);
@@ -466,6 +474,9 @@ function frame(now: number): void {
     resultSelection,
     focusLost,
     keyFlash,
+    guardActive: heldKeys.has('ShiftLeft') || heldKeys.has('ShiftRight'),
+    attackEffectStartedAt,
+    runeEffectStartedAt,
     now,
   });
   requestAnimationFrame(frame);

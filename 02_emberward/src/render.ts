@@ -27,6 +27,9 @@ export interface RenderMeta {
   resultSelection: number;
   focusLost: boolean;
   keyFlash: ReadonlyMap<string, number>;
+  guardActive: boolean;
+  attackEffectStartedAt: number;
+  runeEffectStartedAt: number;
   now: number;
 }
 
@@ -306,6 +309,107 @@ function drawCharacter(context: CanvasRenderingContext2D, state: GameState, pale
   context.restore();
 }
 
+function drawActionEffects(
+  context: CanvasRenderingContext2D,
+  state: GameState,
+  meta: RenderMeta,
+  palette: Palette,
+  cameraX: number,
+): void {
+  if (state.scene !== 'boss') return;
+  const x = state.player.x - cameraX;
+  const y = state.player.y;
+  const attackAge = meta.now - meta.attackEffectStartedAt;
+  const runeAge = meta.now - meta.runeEffectStartedAt;
+  const attackActive = attackAge >= 0 && attackAge < 480;
+  const runeActive = runeAge >= 0 && runeAge < 820;
+  let actionText = '';
+  let actionColor = palette.text;
+
+  context.save();
+  if (meta.guardActive) {
+    const shieldPulse = 38 + Math.sin(meta.now / 75) * 4;
+    context.globalAlpha = 0.18;
+    context.fillStyle = palette.blue;
+    context.beginPath();
+    context.arc(x, y - 3, shieldPulse, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 0.9;
+    context.strokeStyle = palette.blue;
+    context.lineWidth = 5;
+    context.beginPath();
+    context.arc(x, y - 3, shieldPulse, Math.PI * 0.68, Math.PI * 2.32);
+    context.stroke();
+    context.fillStyle = palette.blue;
+    context.beginPath();
+    context.moveTo(x, y - 27);
+    context.lineTo(x + 15, y - 18);
+    context.lineTo(x + 11, y + 7);
+    context.lineTo(x, y + 17);
+    context.lineTo(x - 11, y + 7);
+    context.lineTo(x - 15, y - 18);
+    context.closePath();
+    context.globalAlpha = 0.32;
+    context.fill();
+    actionText = 'SHIFT · 방어 유지';
+    actionColor = palette.blue;
+  }
+
+  if (attackActive) {
+    const progress = Math.min(1, attackAge / 480);
+    context.globalAlpha = 1 - progress * 0.72;
+    context.strokeStyle = palette.gold;
+    context.lineWidth = 10 - progress * 5;
+    context.lineCap = 'round';
+    context.beginPath();
+    context.arc(x, y - 4, 37 + progress * 19, -Math.PI * 0.92, Math.PI * 0.28);
+    context.stroke();
+    context.fillStyle = palette.gold;
+    context.beginPath();
+    context.moveTo(x + 42, y - 31);
+    context.lineTo(x + 58, y - 28);
+    context.lineTo(x + 49, y - 15);
+    context.closePath();
+    context.fill();
+    actionText = 'SPACE · 공격';
+    actionColor = palette.gold;
+  }
+
+  if (runeActive) {
+    const progress = Math.min(1, runeAge / 820);
+    const radius = 28 + progress * 78;
+    const rune = state.equippedRune ?? state.weakness;
+    context.globalAlpha = 0.9 - progress * 0.65;
+    context.strokeStyle = palette.blue;
+    context.lineWidth = 5 - progress * 3;
+    context.beginPath();
+    context.arc(x, y - 5, radius, 0, Math.PI * 2);
+    context.stroke();
+    for (let index = 0; index < 8; index += 1) {
+      const angle = index / 8 * Math.PI * 2 + progress;
+      context.beginPath();
+      context.moveTo(x + Math.cos(angle) * (radius - 12), y - 5 + Math.sin(angle) * (radius - 12));
+      context.lineTo(x + Math.cos(angle) * (radius + 13), y - 5 + Math.sin(angle) * (radius + 13));
+      context.stroke();
+    }
+    context.globalAlpha = Math.max(0.25, 1 - progress);
+    drawRune(context, rune, x, y - 7, 42 + progress * 12, palette.blue);
+    actionText = `1 · ${RUNE_KO[rune]} 룬 발동`;
+    actionColor = palette.blue;
+  }
+  context.restore();
+
+  if (actionText) {
+    roundedRect(context, x - 86, y - 78, 172, 30, 8);
+    context.fillStyle = '#040a09ed';
+    context.fill();
+    context.strokeStyle = actionColor;
+    context.lineWidth = 2;
+    context.stroke();
+    label(context, actionText, x, y - 63, 12, actionColor, 'center', 900);
+  }
+}
+
 function drawInteractMarker(context: CanvasRenderingContext2D, point: Point, cameraX: number, palette: Palette): void {
   const x = point.x - cameraX;
   const pulse = 1 + Math.sin(performance.now() / 180) * 0.08;
@@ -468,7 +572,8 @@ function drawRuneMenu(context: CanvasRenderingContext2D, state: GameState, palet
     label(context, `${RUNE_KO[rune]} 룬`, 355, y, 20, palette.text, 'left', 800);
     if (state.runeSelection === index) label(context, '▶', 675, y, 20, palette.mint, 'right', 900);
   });
-  label(context, '↑ ↓ 선택   ENTER 장착', 480, 485, 14, palette.muted, 'center', 700);
+  label(context, '장착한 룬은 보스전에서 숫자 1로 발동합니다', 480, 458, 14, palette.gold, 'center', 800);
+  label(context, '↑ ↓ 선택   ENTER 장착', 480, 486, 14, palette.muted, 'center', 700);
 }
 
 function cueLabel(kind: BossCueKind): string {
@@ -478,7 +583,41 @@ function cueLabel(kind: BossCueKind): string {
   return '룬 공명';
 }
 
-function drawBoss(context: CanvasRenderingContext2D, state: GameState, palette: Palette): void {
+function cueActionLabel(kind: BossCueKind): string {
+  if (kind === 'cone') return '← →  위험 범위 밖으로 이동';
+  if (kind === 'wave') return 'SHIFT  파동이 끝날 때까지 유지';
+  if (kind === 'open') return 'SPACE  지금 공격';
+  return '1  장착 룬 발동';
+}
+
+function drawBossControls(context: CanvasRenderingContext2D, state: GameState, meta: RenderMeta, palette: Palette): void {
+  roundedRect(context, 18, 90, 224, 136, 12);
+  context.fillStyle = '#040a09e8';
+  context.fill();
+  context.strokeStyle = palette.line;
+  context.lineWidth = 1;
+  context.stroke();
+  label(context, '전투 조작', 34, 111, 13, palette.muted, 'left', 900);
+  const attackActive = meta.now - meta.attackEffectStartedAt < 480;
+  const runeActive = meta.now - meta.runeEffectStartedAt < 820;
+  const entries = [
+    ['SPACE', '개방 때 공격', attackActive, palette.gold],
+    ['SHIFT', '파동 방어', meta.guardActive, palette.blue],
+    ['1', `${state.equippedRune ? RUNE_KO[state.equippedRune] : '약점'} 룬 사용`, runeActive, palette.blue],
+  ] as const;
+  entries.forEach(([key, description, active, color], index) => {
+    const y = 142 + index * 34;
+    roundedRect(context, 33, y - 12, 58, 24, 6);
+    context.fillStyle = active ? color : '#10201c';
+    context.fill();
+    context.strokeStyle = active ? palette.text : palette.line;
+    context.stroke();
+    label(context, key, 62, y, 10, active ? '#07110f' : palette.mint, 'center', 900);
+    label(context, description, 103, y, 12, active ? color : palette.text, 'left', active ? 850 : 650);
+  });
+}
+
+function drawBoss(context: CanvasRenderingContext2D, state: GameState, meta: RenderMeta, palette: Palette): void {
   const bossX = 480;
   const bossY = 150;
   const cue = state.bossCue;
@@ -532,9 +671,16 @@ function drawBoss(context: CanvasRenderingContext2D, state: GameState, palette: 
     context.strokeStyle = cue.responded && cue.success ? palette.mint : palette.danger;
     context.stroke();
     label(context, cueLabel(cue.kind), 480, 272, 18, cue.responded && cue.success ? palette.mint : palette.text, 'center', 900);
+    roundedRect(context, 350, 302, 260, 35, 9);
+    context.fillStyle = '#040a09e8';
+    context.fill();
+    context.strokeStyle = cue.responded && cue.success ? palette.mint : palette.gold;
+    context.stroke();
+    label(context, cue.responded && cue.success ? '대응 성공' : cueActionLabel(cue.kind), 480, 320, 13, cue.responded && cue.success ? palette.mint : palette.gold, 'center', 900);
   } else {
     label(context, '다음 움직임 관찰 중…', 480, 272, 15, palette.muted, 'center');
   }
+  drawBossControls(context, state, meta, palette);
 }
 
 function drawBeacon(context: CanvasRenderingContext2D, state: GameState, palette: Palette): void {
@@ -570,6 +716,7 @@ function drawHud(context: CanvasRenderingContext2D, state: GameState, palette: P
   const remaining = Math.max(0, 180 - state.tick / TICKS_PER_SECOND);
   label(context, `${remaining.toFixed(1)}s`, 925, 25, 17, remaining < 30 ? palette.danger : palette.gold, 'right', 900);
   label(context, `HP ${'◆'.repeat(state.playerHp)}${'◇'.repeat(state.maxHp - state.playerHp)}`, 925, 50, 14, palette.mint, 'right', 800);
+  if (state.equippedRune) label(context, `[1] ${RUNE_KO[state.equippedRune]} 룬 장착`, 750, 50, 13, palette.blue, 'right', 850);
   if (state.message) {
     roundedRect(context, 205, 466, 550, 48, 10);
     context.fillStyle = '#040a09ed';
@@ -728,9 +875,10 @@ export function renderGame(
   else if (state.scene === 'forest') drawForest(context, state, palette, cameraX);
   else if (state.scene === 'mural') drawMuralRoom(context, state, palette);
   else if (state.scene === 'altar') drawAltars(context, state, palette);
-  else if (state.scene === 'boss') drawBoss(context, state, palette);
+  else if (state.scene === 'boss') drawBoss(context, state, meta, palette);
   else if (state.scene === 'beacon') drawBeacon(context, state, palette);
   drawCharacter(context, state, palette, cameraX);
+  drawActionEffects(context, state, meta, palette, cameraX);
   drawHud(context, state, palette);
   drawKeyFeedback(context, meta, palette);
 
