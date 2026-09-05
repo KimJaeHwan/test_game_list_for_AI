@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas/public-play-handoff/1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest", "frames", "observations", "actions"],
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "artifactId", "runId", "status", "validity",
+        "framePolicyVersion", "inputPolicyVersion", "capture", "counts",
+        "files", "payloadDigest"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "atlas/public-play-handoff/1" },
+        "artifactId": { "type": "string" },
+        "runId": { "type": "string" },
+        "status": { "enum": ["COMPLETE", "PARTIAL", "INVALID"] },
+        "validity": { "enum": ["OFFICIAL", "ASSISTED", "INVALID"] },
+        "framePolicyVersion": { "enum": ["canvas-served/v1", "opaque-overlay/v1"] },
+        "inputPolicyVersion": { "enum": ["keyboard-restricted/v1", "opaque-object/v1"] },
+        "capture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height", "format", "colorSpace"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "format": { "const": "png" },
+            "colorSpace": { "const": "srgb" }
+          }
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["frames", "observations", "actions", "interventions"],
+          "properties": {
+            "frames": { "type": "integer", "minimum": 0 },
+            "observations": { "type": "integer", "minimum": 0 },
+            "actions": { "type": "integer", "minimum": 0 },
+            "interventions": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "relativeName", "bytes", "sha256"],
+            "properties": {
+              "role": { "enum": ["frames", "observations", "actions"] },
+              "relativeName": {
+                "type": "string",
+                "pattern": "^(frames/F[0-9]{6}\\.png|observations\\.ndjson|actions\\.ndjson)$"
+              },
+              "bytes": { "type": "integer", "minimum": 0 },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            }
+          }
+        },
+        "payloadDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["frameId", "ordinal", "mediaRef", "sha256", "evidenceRole", "sourceActionRefs"],
+        "properties": {
+          "frameId": { "type": "string", "pattern": "^F[0-9]{6}$" },
+          "ordinal": { "type": "integer", "minimum": 1 },
+          "mediaRef": { "type": "string", "pattern": "^frames/F[0-9]{6}\\.png$" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "evidenceRole": { "const": "CITEABLE" },
+          "sourceActionRefs": { "type": "array", "items": { "type": "string", "pattern": "^A[0-9]{6}$" } }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observationId", "ordinal", "frameRefs", "precedingActionRefs"],
+        "properties": {
+          "observationId": { "type": "string", "pattern": "^O[0-9]{6}$" },
+          "ordinal": { "type": "integer", "minimum": 1 },
+          "frameRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^F[0-9]{6}$" } },
+          "precedingActionRefs": { "type": "array", "items": { "type": "string", "pattern": "^A[0-9]{6}$" } }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actionId", "ordinal", "input", "delivery", "beforeFrameRef", "afterFrameRefs", "changeClass"],
+        "properties": {
+          "actionId": { "type": "string", "pattern": "^A[0-9]{6}$" },
+          "ordinal": { "type": "integer", "minimum": 1 },
+          "input": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "code"],
+                "properties": { "kind": { "const": "keyTap" }, "code": { "type": "string" } }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind"],
+                "properties": { "kind": { "const": "opaqueActivate" } }
+              }
+            ]
+          },
+          "delivery": { "enum": ["DELIVERED", "NOT_DELIVERED", "DELIVERY_UNKNOWN"] },
+          "beforeFrameRef": { "type": "string", "pattern": "^F[0-9]{6}$" },
+          "afterFrameRefs": { "type": "array", "items": { "type": "string", "pattern": "^F[0-9]{6}$" } },
+          "changeClass": { "enum": ["UNCHANGED", "TRANSIENT_ONLY", "PERSISTENT_CHANGE", "UNCERTAIN"] }
+        }
+      }
+    }
+  }
+}

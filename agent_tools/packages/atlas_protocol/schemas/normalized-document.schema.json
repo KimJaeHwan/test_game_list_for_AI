@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas/normalized-document/1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "pages"],
+  "properties": {
+    "schemaVersion": { "const": "atlas/normalized-document/1" },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "nodes"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "nodes": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "level", "text"],
+                  "properties": {
+                    "type": { "const": "heading" },
+                    "level": { "type": "integer", "minimum": 1, "maximum": 4 },
+                    "text": { "type": "string", "minLength": 1, "maxLength": 200 }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "text"],
+                  "properties": {
+                    "type": { "enum": ["paragraph", "emphasis", "strong"] },
+                    "text": { "type": "string", "minLength": 1, "maxLength": 800 }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "ordered", "items"],
+                  "properties": {
+                    "type": { "const": "list" },
+                    "ordered": { "type": "boolean" },
+                    "items": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "headers", "rows"],
+                  "properties": {
+                    "type": { "const": "table" },
+                    "headers": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 12,
+                      "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+                    },
+                    "rows": {
+                      "type": "array",
+                      "maxItems": 128,
+                      "items": {
+                        "type": "array",
+                        "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "label", "targetTitle"],
+                  "properties": {
+                    "type": { "const": "link" },
+                    "label": { "type": "string", "minLength": 1, "maxLength": 160 },
+                    "targetTitle": { "type": "string", "minLength": 1, "maxLength": 120 }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "message": "atlas-protocol-test-vector-v1",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABKQRYFQad9Jatwx39s73sGn330Us84XSMpffQWpm/tc=\n-----END PUBLIC KEY-----\n",
+  "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEII5uqC7uYxEmOBt2hEMVFiPMjRP9ilXk6rG/7G2+qx2f\n-----END PRIVATE KEY-----\n",
+  "signatureBase64url": "6v0sqi-Gm8P3NFFPWWyyywrMBef6yftyWuDEoJZ1HE142EGQNXI_MO9BAPDiYpx_Aw9g9XExz9mqCCpkDcrjBw"
+}

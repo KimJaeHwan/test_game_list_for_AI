@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas/evidence-comparison-plan/1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "planId", "groups", "signature"],
+  "properties": {
+    "schemaVersion": { "const": "atlas/evidence-comparison-plan/1" },
+    "planId": { "type": "string" },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["groupRef", "handoffDigests"],
+        "properties": {
+          "groupRef": { "type": "string", "pattern": "^G[0-9]{2,6}$" },
+          "handoffDigests": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
+      }
+    },
+    "signature": { "type": "string", "minLength": 32 }
+  }
+}

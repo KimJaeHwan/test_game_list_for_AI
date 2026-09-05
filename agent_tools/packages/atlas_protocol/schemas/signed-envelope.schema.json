@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "atlas/signed-envelope/1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["header", "payload", "signature"],
+  "properties": {
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactType", "schemaVersion", "artifactId", "campaignId", "track",
+        "arm", "targetRunId", "issuer", "keyId", "nonce", "parentDigests",
+        "payloadDigest", "contractDigest"
+      ],
+      "properties": {
+        "artifactType": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "artifactId": { "type": "string", "minLength": 1 },
+        "campaignId": { "type": "string", "minLength": 1 },
+        "track": { "type": "string", "minLength": 1 },
+        "arm": { "type": "string", "minLength": 1 },
+        "targetRunId": { "type": "string", "minLength": 1 },
+        "issuer": { "type": "string", "minLength": 1 },
+        "keyId": { "type": "string", "minLength": 1 },
+        "nonce": { "type": "string", "minLength": 1 },
+        "parentDigests": { "type": "array", "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" } },
+        "payloadDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "contractDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "payload": true,
+    "signature": { "type": "string", "minLength": 32 }
+  }
+}

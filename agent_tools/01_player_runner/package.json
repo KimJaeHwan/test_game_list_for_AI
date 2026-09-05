@@ -1,0 +1,13 @@
+{
+  "name": "@atlas/01-player-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "verify": "node scripts/verify.mjs && node scripts/verify-service.mjs",
+    "stdio": "node src/stdio-server.mjs"
+  }
+}
