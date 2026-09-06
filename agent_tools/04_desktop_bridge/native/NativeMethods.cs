@@ -26,6 +26,7 @@ internal static class NativeMethods
     public const uint InputKeyboard = 1;
     public const uint KeyeventfExtendedKey = 0x0001;
     public const uint KeyeventfKeyup = 0x0002;
+    public const uint KeyeventfScancode = 0x0008;
     public const uint MouseeventfMove = 0x0001;
     public const uint MouseeventfLeftdown = 0x0002;
     public const uint MouseeventfLeftup = 0x0004;

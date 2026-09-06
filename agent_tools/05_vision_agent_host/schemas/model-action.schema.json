@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModelAction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action"],
+  "properties": {
+    "action": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action"],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["refresh_frame"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action", "frameIds"],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["bookmark"]
+            },
+            "frameIds": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^F\\d{6}$"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action", "reason"],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["finish"]
+            },
+            "reason": {
+              "type": "string",
+              "enum": ["COMPLETE", "PARTIAL", "ABORT"]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

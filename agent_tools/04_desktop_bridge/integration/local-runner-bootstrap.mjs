@@ -23,6 +23,30 @@ import {
   createProviderLifecycle,
 } from "../src/provider-contract.mjs";
 
+export const ROLLOVER_ENDURANCE_RUNNER_PROFILE = "ROLLOVER_ENDURANCE_2X";
+
+const ROLLOVER_ENDURANCE_RUNNER_OPTIONS = Object.freeze({
+  budgets: Object.freeze({
+    observe: 180,
+    keyboard: 60,
+    bookmark: 180,
+    object: 50,
+    handoff: 2,
+  }),
+  capabilityTtlMs: 3_000_000,
+});
+
+export function runnerOptionsForProfile(source = process.env) {
+  const profile = source.ATLAS_RUNNER_PROFILE;
+  if (profile === undefined) return Object.freeze({});
+  if (profile !== ROLLOVER_ENDURANCE_RUNNER_PROFILE) {
+    const error = new Error("ATLAS_RUNNER_PROFILE is not a trusted runner profile.");
+    error.code = "RUNNER_PROFILE_INVALID";
+    throw error;
+  }
+  return ROLLOVER_ENDURANCE_RUNNER_OPTIONS;
+}
+
 function requiredEnvironment(name) {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required.`);
@@ -54,6 +78,7 @@ function parseAllowedKeys(value) {
 }
 
 export async function createPlayerRunnerService() {
+  const runnerOptions = runnerOptionsForProfile(process.env);
   // Coordinator identities exist before the operator-selected private target is read.
   const campaignId = coordinatorRandomId();
   const publicRunId = coordinatorRandomId();
@@ -133,6 +158,8 @@ export async function createPlayerRunnerService() {
     clientBinding: `stdio-${publicRunId}`,
     wal: new FileWalStore(join(runRoot, "input.wal")),
     allowedKeys,
+    explorationTrack: process.env.ATLAS_EXPLORATION_TRACK ?? "EXPLORATION",
+    ...runnerOptions,
   });
   } catch (error) {
     try {

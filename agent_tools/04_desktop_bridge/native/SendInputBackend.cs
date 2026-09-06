@@ -8,10 +8,14 @@ internal sealed class SendInputBackend : IInputBackend
 
     public InputBackendResult TapKey(ValidatedKeyTap key)
     {
-        uint commonFlags = key.Extended
-            ? NativeMethods.KeyeventfExtendedKey
-            : 0;
-        var inputs = new[]
+        return SendOnce(BuildKeyTapInputs(key));
+    }
+
+    internal static Input[] BuildKeyTapInputs(ValidatedKeyTap key)
+    {
+        uint commonFlags = NativeMethods.KeyeventfScancode |
+            (key.Extended ? NativeMethods.KeyeventfExtendedKey : 0);
+        return new[]
         {
             new Input
             {
@@ -20,7 +24,8 @@ internal sealed class SendInputBackend : IInputBackend
                 {
                     Keyboard = new KeyboardInput
                     {
-                        VirtualKey = key.VirtualKey,
+                        VirtualKey = 0,
+                        ScanCode = key.ScanCode,
                         Flags = commonFlags,
                     },
                 },
@@ -32,14 +37,13 @@ internal sealed class SendInputBackend : IInputBackend
                 {
                     Keyboard = new KeyboardInput
                     {
-                        VirtualKey = key.VirtualKey,
+                        VirtualKey = 0,
+                        ScanCode = key.ScanCode,
                         Flags = commonFlags | NativeMethods.KeyeventfKeyup,
                     },
                 },
             },
         };
-
-        return SendOnce(inputs);
     }
 
     public InputBackendResult Click(ValidatedMouseClick click)

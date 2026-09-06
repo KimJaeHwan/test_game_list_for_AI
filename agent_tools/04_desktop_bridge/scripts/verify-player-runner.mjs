@@ -20,6 +20,28 @@ import {
   createLegacyBridgeCaptureProvider,
   createProviderLifecycle,
 } from "../src/provider-contract.mjs";
+import {
+  ROLLOVER_ENDURANCE_RUNNER_PROFILE,
+  runnerOptionsForProfile,
+} from "../integration/local-runner-bootstrap.mjs";
+
+assert.deepEqual(runnerOptionsForProfile({}), {});
+assert.deepEqual(runnerOptionsForProfile({
+  ATLAS_RUNNER_PROFILE: ROLLOVER_ENDURANCE_RUNNER_PROFILE,
+}), {
+  budgets: {
+    observe: 180,
+    keyboard: 60,
+    bookmark: 180,
+    object: 50,
+    handoff: 2,
+  },
+  capabilityTtlMs: 3_000_000,
+});
+assert.throws(
+  () => runnerOptionsForProfile({ ATLAS_RUNNER_PROFILE: "UNTRUSTED_PROFILE" }),
+  { code: "RUNNER_PROFILE_INVALID" },
+);
 
 const identity = Object.freeze({
   hwnd: "9001",

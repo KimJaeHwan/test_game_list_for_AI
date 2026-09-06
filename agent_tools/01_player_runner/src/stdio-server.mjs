@@ -147,7 +147,17 @@ async function main() {
     throw new Error("Trusted bootstrap must export createPlayerRunnerService().");
   }
   const service = await bootstrap.createPlayerRunnerService();
-  await serveStdio({ service });
+  try {
+    await serveStdio({ service });
+  } finally {
+    if (typeof service.closeTrusted === "function") {
+      try {
+        await service.closeTrusted();
+      } catch (error) {
+        process.stderr.write(`atlas-player-runner trusted cleanup failed: ${error?.name ?? "Error"}\n`);
+      }
+    }
+  }
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;

@@ -7,6 +7,7 @@ import { OpaqueOptionResolver } from "./option-resolver.mjs";
 import { RunStateMachine } from "./run-state.mjs";
 import { RunnerError } from "./errors.mjs";
 import { SignedReceiptChain } from "./signed-chain.mjs";
+import { validateExplorationTrack, validityForExplorationTrack } from "./exploration-track.mjs";
 
 const TOOL_NAMES = Object.freeze([
   "attach_run",
@@ -120,6 +121,7 @@ export class PlayerRunnerService {
     capabilityTtlMs = 30 * 60 * 1_000,
     budgets,
     allowedKeys = DEFAULT_CAMPAIGN_PROFILE.allowedKeys,
+    explorationTrack = "EXPLORATION",
   }) {
     if (!internalRunId || !identityPool || !signingPrivateKey || !runnerKeyId || !clientBinding || !wal) {
       throw new TypeError("PlayerRunnerService requires Coordinator identity, signing, client binding, and WAL dependencies.");
@@ -130,6 +132,7 @@ export class PlayerRunnerService {
     if (artifactStore !== undefined && typeof artifactStore?.persist !== "function") {
       throw new TypeError("artifactStore must implement persist().");
     }
+    this.explorationTrack = validateExplorationTrack(explorationTrack);
     this.adapter = validateAdapter(adapter);
     this.internalRunId = internalRunId;
     this.identityPool = identityPool;
@@ -152,6 +155,7 @@ export class PlayerRunnerService {
       privateKey: signingPrivateKey,
       keyId: runnerKeyId,
       identityPool,
+      explorationTrack: this.explorationTrack,
     });
     this.optionResolver = new OpaqueOptionResolver({ clock });
     this.observations = [];
@@ -371,24 +375,43 @@ export class PlayerRunnerService {
     if (args.afterFrameId !== this.frames.latestServedFrameId) {
       throw new RunnerError("STALE_OBSERVATION", "afterFrameId is not the latest served frame.", { retry: "DO_NOT_RETRY" });
     }
-    const frame = await this.#captureAndServe({ purpose: "wait", afterFrameId: args.afterFrameId, maxFrames: args.maxFrames });
-    if (!CHANGE_CLASSES.has(frame.changeClass)) {
-      throw new RunnerError("TRUSTED_ADAPTER_INVALID", "capture() returned an invalid visual change class.");
-    }
-    if (this.pendingDeliveredRequestId) {
-      this.inputGateway.settleDelivered({
-        requestId: this.pendingDeliveredRequestId,
-        afterFrameIds: [frame.frameId],
+    try {
+      const frame = await this.#captureAndServe({ purpose: "wait", afterFrameId: args.afterFrameId, maxFrames: args.maxFrames });
+      if (!CHANGE_CLASSES.has(frame.changeClass)) {
+        throw new RunnerError("TRUSTED_ADAPTER_INVALID", "capture() returned an invalid visual change class.");
+      }
+      if (this.pendingDeliveredRequestId) {
+        this.inputGateway.settleDelivered({
+          requestId: this.pendingDeliveredRequestId,
+          afterFrameIds: [frame.frameId],
+          changeClass: frame.changeClass,
+        });
+        this.pendingDeliveredRequestId = undefined;
+      }
+      return Object.freeze({
+        frameId: frame.frameId,
+        image: frame.image,
+        sha256: frame.sha256,
         changeClass: frame.changeClass,
       });
-      this.pendingDeliveredRequestId = undefined;
+    } catch (error) {
+      if (this.pendingDeliveredRequestId) {
+        try {
+          this.inputGateway.settleDelivered({
+            requestId: this.pendingDeliveredRequestId,
+            afterFrameIds: [],
+            changeClass: "UNCERTAIN",
+          });
+          this.pendingDeliveredRequestId = undefined;
+        } catch {
+          // Preserve the capture failure while the state machine is fenced below.
+        }
+      }
+      if (this.stateMachine.canTransition("BLOCKED")) {
+        this.stateMachine.transition("BLOCKED", "outcome-capture-failed");
+      }
+      throw error;
     }
-    return Object.freeze({
-      frameId: frame.frameId,
-      image: frame.image,
-      sha256: frame.sha256,
-      changeClass: frame.changeClass,
-    });
   }
 
   bookmarkObservation(untrustedArgs) {
@@ -425,11 +448,25 @@ export class PlayerRunnerService {
     this.#authorize(requireOpaque(args.handoffCap, "handoffCap"), "handoff", true);
     this.stateMachine.assert("READY", "PAUSED_FOCUS", "PAUSED_POLICY", "BLOCKED");
     this.stateMachine.transition("ENDING", `agent-end-${args.reason.toLowerCase()}`);
+    this.endReason = args.reason;
     if (typeof this.adapter.end === "function") {
       await this.adapter.end(Object.freeze({ sessionHandle: this.launchContext.sessionHandle, reason: args.reason }));
+      this.adapterEndCompleted = true;
     }
-    this.endReason = args.reason;
     return Object.freeze({ state: "ENDING" });
+  }
+
+  async closeTrusted() {
+    if (!this.launchContext || typeof this.adapter.end !== "function") {
+      return Object.freeze({ closed: false });
+    }
+    if (this.adapterEndCompleted) return Object.freeze({ closed: true });
+    await this.adapter.end(Object.freeze({
+      sessionHandle: this.launchContext.sessionHandle,
+      reason: this.endReason ?? "PARTIAL",
+    }));
+    this.adapterEndCompleted = true;
+    return Object.freeze({ closed: true });
   }
 
   async sealHandoff(untrustedArgs) {
@@ -450,11 +487,12 @@ export class PlayerRunnerService {
         receiptChain: this.receiptChain,
         frames: this.frames,
         inputGateway: this.inputGateway,
+        explorationTrack: this.explorationTrack,
       });
       this.sealedArtifacts = sealer.seal({
         observations: this.observations,
         status: this.endReason === "COMPLETE" ? "COMPLETE" : "PARTIAL",
-        validity: "OFFICIAL",
+        validity: validityForExplorationTrack(this.explorationTrack),
         framePolicyVersion: this.launchContext.framePolicyVersion ?? "canvas-served/v1",
         inputPolicyVersion: this.launchContext.inputPolicyVersion ?? "keyboard-restricted/v1",
       });

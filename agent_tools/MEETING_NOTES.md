@@ -113,3 +113,25 @@ source run의 키 순서가 문서에 들어가면 동일 조건 재현은 콘�
 - 사람 개입을 OFFICIAL/ASSISTED로 분류하는 세부 규칙
 
 이 값들은 전체 목적을 개발 Agent에게 공개하지 않고 Contract Manager가 versioned profile로 제공합니다.
+
+## 후속 회의: 증거 승격과 범용 탐색
+
+긴 campaign 결과에서 실제 근거가 없는 '항구 통행증', 표기가 충돌하는 '영약/영액'과 '푸른소금풀/푸른소금결정', 기존 상태·행동 반복이 확인되어 세 관점의 독립 검토를 진행했습니다.
+
+- 지식 무결성 검토: 모델은 위키를 직접 쓰지 않고 evidence-bound atomic claim만 제안하며 entity registry와 결정론적 validator가 승격을 결정
+- 탐색 정책 검토: NPC·지역·퀘스트가 아니라 visual state, affordance, allowed action, context, outcome 전이를 기준으로 Evidence-Grounded Frontier Exploration 채택
+- 적대 평가 검토: hidden truth와 점수는 runtime에 전달하지 않고 unsupported entity, 반복률, 검증된 신규 전이, 모순 해결과 false-Wiki 철회를 평가
+
+합의:
+
+1. 현재 assisted Wiki는 정화 전까지 legacy/provisional로 취급한다.
+2. 근거 없는 이름은 claim 단위로 격리하고 전체 Wiki build는 계속한다.
+3. 같은 frame 재판독이나 이전 Wiki 인용은 독립 증거가 아니다.
+4. 자연어 질문은 증거 요구량과 판정 조건이 있는 test card로 변환한 뒤에만 행동 목표가 된다.
+5. 대상 이름이 아니라 동일 state/action/context/outcome의 증거 포화도를 기준으로 반복 우선순위를 낮춘다.
+6. context가 달라지거나 claim이 약함·충돌·stale 상태이면 같은 대상도 재조사한다.
+7. Player model은 후보만 제안하며 host가 gate, 중복 제거, 점수, 예산, loop recovery를 결정한다.
+8. 구현은 Wiki 정화와 claim gate를 먼저 완료한 뒤 탐색 scheduler를 연결한다.
+9. Quest Atlas 외 장르와 오염된 사전 Wiki를 포함한 holdout 시험을 통과해야 범용 정책으로 인정한다.
+
+상세 단계와 수용 기준은 [다음 개발 계획](NEXT_DEVELOPMENT_PLAN.md)에 고정했습니다.

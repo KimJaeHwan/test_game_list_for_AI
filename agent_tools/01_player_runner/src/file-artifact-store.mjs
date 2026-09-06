@@ -10,7 +10,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { canonicalize, sha256 } from "../../packages/atlas_protocol/src/index.mjs";
 import { RunnerError } from "./errors.mjs";
 
-const ARTIFACT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$/u;
+const ARTIFACT_ID = /^(?:[A-Za-z0-9_-]{22}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
 const PUBLIC_FILE_NAME = /^(?:frames\/F\d{6}\.png|observations\.ndjson|actions\.ndjson)$/u;
 
 function normalizeForComparison(path) {

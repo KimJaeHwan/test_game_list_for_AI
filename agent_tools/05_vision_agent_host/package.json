@@ -1,0 +1,12 @@
+{
+  "name": "@atlas/05-vision-agent-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "verify": "node scripts/verify.mjs"
+  }
+}

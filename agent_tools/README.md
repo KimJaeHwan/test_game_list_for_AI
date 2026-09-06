@@ -9,7 +9,7 @@
 3. 다른 새 에이전트가 그 문서만 보고 같은 콘텐츠를 재현할 수 있는가
 4. 배치와 표현이 바뀌어도 문서의 의미가 전이되는가
 
-모든 실행은 로컬에서 이루어집니다. 게임 화면, 플레이 기록, 위키 후보, 비공개 seed와 평가 결과를 외부 서비스에 업로드하지 않는 것을 기본 정책으로 삼습니다.
+게임·Runner·증거 저장·위키·평가는 로컬에서 실행됩니다. 새 Vision Agent Host로 Codex/GPT를 붙이는 실제 플레이만 예외이며, 이때 모델이 보는 화면 PNG는 OpenAI로 전송됩니다. 명시적인 업로드 확인 플래그가 없으면 캡처와 모델 호출 전에 실패하도록 만들었습니다.
 
 ## 문서 구성
 
@@ -21,18 +21,27 @@
 - [04 Desktop Bridge](04_desktop_bridge/DESIGN.md): URL·CDP 없이 선택 창 픽셀 캡처와 제한 OS 입력
 - [Desktop Bridge 계약](04_desktop_bridge/CONTRACT.md): 공통 target gate, stable capture/input provider, 무 fallback·무 재시도 규칙
 - [Desktop Bridge 에이전트 배정](04_desktop_bridge/AGENT_ASSIGNMENTS.md): 모듈별 소유 경로와 독립 검증 결과
+- [05 Vision Agent Host](05_vision_agent_host/DESIGN.md): Codex headless 화면 판단, 단일 행동 감독, Runner stdio 연결
+- [06 Assisted Wiki Loop](06_assisted_wiki_loop/DESIGN.md): 봉인 증거의 누적 Wiki revision과 다음 플레이용 제한 컨텍스트
+- [07 Checkpoint Campaign](07_checkpoint_campaign/DESIGN.md): 선제 봉인, Wiki ACK, 물리 episode·topic shard와 fresh-session 재개
+- [Vision Agent Host 계약](05_vision_agent_host/CONTRACT.md): 키보드 v1의 예산·전달 fence·격리 종료 규칙
 - [블라인드 개발 운영](BLIND_DEVELOPMENT.md): 모듈 개발 에이전트의 지식과 파일 권한을 격리
 - [서브에이전트 회의 기록](MEETING_NOTES.md): 독립 설계와 적대적 교차검토에서 합의한 결정
+- [다음 개발 계획](NEXT_DEVELOPMENT_PLAN.md): 증거 기반 지식 승격, 허위 엔티티 격리, 장르 비종속 EGFE 탐색 정책과 단계별 수용 기준
 
 ## 현재 구현 상태
 
 | 영역 | MVP 상태 | 구현 내용 |
 |---|---|---|
 | Atlas Protocol | 완료 | 결정론적 canonical JSON, SHA-256, Ed25519 서명, 공용 스키마, 금지 데이터 검사 |
-| Player Runner | 완료 | 프레임 관찰, 허용 키 입력, opaque option, capability, WAL, receipt chain, 봉인 저장, MCP 호환 stdio |
+| Player Runner | 완료 | 프레임 관찰, 허용 키 입력, opaque option, capability, WAL, receipt chain, `EXPLORATION`/`ASSISTED_EXPLORATION` 서명, 봉인 저장, MCP 호환 stdio |
 | Wiki Foundry | 완료 | 봉인 handoff 검증, 증거 저장소, 사실·절차·모순·미확인 구조화, 결정론적 Markdown/AST, 서명 |
 | Replay Judge | 완료 | 문서 검증, 비공개 probe, fresh-state 이중 재생, strict/assisted 분리, 전이 비교와 누출 검사 |
 | Desktop Bridge | 완료 | 운영자 전용 target 선택, trusted bootstrap에 고정된 독립 capture/input provider, GDI+SendInput 기본, 무 fallback, 좌표 비노출 |
+| Vision Agent Host | v1 완료 | Codex CLI exec/resume, PNG 입력, 동적 행동 schema, 한 turn 한 행동, delivery fence, 전 프레임 저장, rollover보다 먼저 평가하는 안전 checkpoint 봉인 |
+| Assisted Wiki Loop | v1 완료 | source의 모든 signed frame을 최대 12장씩 여러 fresh Wiki Agent로 분석, 전 batch 원자 병합, 실행 중복 차단, immutable revision, ACK-bound Player context |
+| Checkpoint Campaign | v1 코어·통합 완료 | 누적 예산, PARTIAL seal→Wiki ACK→digest context 순서, fresh Player session, episode별 물리 Wiki, 자동 topic/episode shard와 top-K context |
+| Evidence Integrity + EGFE | 계획됨 | 기존 Wiki 정화, claim 승격 gate, test-card, state/action/outcome frontier, 범용·적대 평가 |
 | Quest Atlas 통합 | 완료 | 실제 게임 reducer source/transfer 검증; CDP adapter는 레거시 개발 참고용 |
 | 종단 연결 | 완료 | Runner → Foundry → Judge 서명 체인과 증거 폐쇄성 검증 |
 
@@ -41,7 +50,7 @@ cd D:\git\test_game\agent_tools
 test.cmd all
 ```
 
-`test.cmd`는 PATH의 Node.js를 먼저 찾고, 없으면 Codex 데스크톱에 포함된 Node.js를 자동으로 사용하므로 `npm`이 없어도 됩니다. 위 명령은 외부 API를 호출하지 않으며 모델 사용료를 발생시키지 않습니다. 실제 AI 플레이는 이 로컬 Runner를 AI/MCP 클라이언트에 연결했을 때 시작됩니다.
+`test.cmd`는 PATH의 Node.js를 먼저 찾고, 없으면 Codex 데스크톱에 포함된 Node.js를 자동으로 사용하므로 `npm`이 없어도 됩니다. 위 명령은 fake 모델만 사용하고 외부 API를 호출하지 않으므로 모델 사용량을 소비하지 않습니다. 실제 AI 플레이는 운영자가 `vision-player.cmd --confirm-openai-upload` 또는 `campaign-player.cmd --confirm-openai-upload`를 실행했을 때만 시작됩니다.
 
 ## 전체 흐름
 
@@ -55,7 +64,20 @@ Trusted Target Picker
 Trusted Config Broker
         │ private configHandle
         ▼
-01 Player Runner ── PublicPlayHandoff ──▶ 02 Wiki Foundry
+01 Player Runner ◀──bounded tools──▶ 05 Vision Agent Host ──PNG──▶ Codex/GPT
+        │
+        ├──────── PublicPlayHandoff ──▶ 02 Wiki Foundry (STRICT 평가)
+        │
+        └──────── sealed evidence ────▶ 07 Checkpoint Campaign
+                                              │ safe PARTIAL checkpoint
+                                              ▼
+                                       06 Assisted Wiki Loop
+                                              │ all frames / batches of 12
+                                              │ episode Wiki + exact publish ACK
+                                              ▼
+                                      topic/episode shard router
+                                              │ relevant top-K bounded context
+                                              └──────────────▶ fresh 05 Vision Agent Host (ASSISTED)
         │                                      │
         │ PrivateJudgeEnvelope                 │ KnowledgeSubmission
         │                                      ▼
@@ -74,6 +96,10 @@ Trusted Config Broker
 ```
 
 Player, Wiki, Reproduction 에이전트는 매 단계마다 새 프로세스·새 작업공간·새 target binding을 사용합니다. 대화 메모, 클립보드, 애플리케이션 저장소, 네트워크 캐시를 공유하지 않습니다. 기본 화면 경로는 운영자가 선택한 Windows 창의 합성 픽셀이며 URL이나 CDP를 사용하지 않습니다. Desktop capture/input provider 역시 운영자가 세션 시작 전에 고정합니다. 변경 시 기존 lifecycle을 닫고 새 target binding·launch·policy attestation을 만들며 실행 중 자동 fallback은 허용하지 않습니다.
+
+장시간 ASSISTED campaign은 모델의 숨은 context compaction event를 신뢰하지 않습니다. Vision Host가 55,000-token rollover보다 낮은 명시적 threshold 또는 키·프레임 경계를 먼저 검사하고 안전한 결정 경계에서 episode를 봉인합니다. 해당 episode의 모든 Wiki batch 게시, ACK와 파일 digest 검증, 관련 context 로드가 끝나기 전에는 다음 fresh Player session을 시작하지 않습니다. 이 반복 탐사 결과는 공식 STRICT 점수와 계속 분리됩니다.
+
+현재 Codex CLI 연결은 기능 검증용 v1입니다. read-only/빈 작업 디렉터리와 금지 도구 이벤트 검사를 적용했지만, 프롬프트만으로 OS 수준 격리를 증명하지 않습니다. 사내 게임 화면을 사용할 때에는 별도 VM 또는 전용 OS identity와 회사의 외부 데이터 전송 승인이 필요합니다.
 
 ## 신뢰 경계
 
@@ -107,3 +133,5 @@ Player, Wiki, Reproduction 에이전트는 매 단계마다 새 프로세스·�
 6. private holdout에서 baseline/candidate/oracle 실험을 실행합니다.
 
 각 모듈 개발자는 이 인덱스 전체를 받지 않습니다. 실제 개발 배정은 [블라인드 개발 운영](BLIND_DEVELOPMENT.md)의 역할별 Contract Pack만 전달해야 합니다.
+
+다음 구현은 [다음 개발 계획](NEXT_DEVELOPMENT_PLAN.md)의 P0부터 순서대로 진행합니다. 계획된 기능을 현재 지원 기능으로 오해하지 않도록, 각 단계의 종료 기준을 통과하기 전에는 RUNBOOK의 실행 명령에 추가하지 않습니다.

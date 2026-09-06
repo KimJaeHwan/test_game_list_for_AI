@@ -17,6 +17,13 @@ const suites = [
   "04_desktop_bridge/scripts/verify.mjs",
   "04_desktop_bridge/scripts/verify-player-runner.mjs",
   "04_desktop_bridge/scripts/verify-boundaries.mjs",
+  "05_vision_agent_host/scripts/verify.mjs",
+  "integration/vision_host/verify.mjs",
+  "06_assisted_wiki_loop/scripts/verify-core.mjs",
+  "06_assisted_wiki_loop/scripts/verify-model.mjs",
+  "integration/assisted_wiki_loop/verify.mjs",
+  "07_checkpoint_campaign/scripts/verify.mjs",
+  "integration/checkpoint_campaign/verify.mjs",
   "scripts/verify-boundaries.mjs",
 ];
 

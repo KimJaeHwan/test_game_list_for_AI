@@ -18,26 +18,26 @@ internal static class WindowsDesktop
     private static readonly IReadOnlyDictionary<string, KeySpec> AllowedKeys =
         new Dictionary<string, KeySpec>(StringComparer.Ordinal)
         {
-            ["ArrowUp"] = new(0x26, true),
-            ["ArrowDown"] = new(0x28, true),
-            ["ArrowLeft"] = new(0x25, true),
-            ["ArrowRight"] = new(0x27, true),
-            ["Enter"] = new(0x0D, false),
-            ["Tab"] = new(0x09, false),
-            ["Space"] = new(0x20, false),
-            ["Shift"] = new(0x10, false),
-            ["KeyA"] = new(0x41, false),
-            ["KeyB"] = new(0x42, false),
-            ["KeyC"] = new(0x43, false),
-            ["KeyD"] = new(0x44, false),
-            ["KeyE"] = new(0x45, false),
-            ["KeyF"] = new(0x46, false),
-            ["KeyN"] = new(0x4E, false),
-            ["KeyR"] = new(0x52, false),
-            ["Digit1"] = new(0x31, false),
-            ["Digit2"] = new(0x32, false),
-            ["Digit3"] = new(0x33, false),
-            ["Digit4"] = new(0x34, false),
+            ["ArrowUp"] = new(0x48, true),
+            ["ArrowDown"] = new(0x50, true),
+            ["ArrowLeft"] = new(0x4B, true),
+            ["ArrowRight"] = new(0x4D, true),
+            ["Enter"] = new(0x1C, false),
+            ["Tab"] = new(0x0F, false),
+            ["Space"] = new(0x39, false),
+            ["Shift"] = new(0x2A, false),
+            ["KeyA"] = new(0x1E, false),
+            ["KeyB"] = new(0x30, false),
+            ["KeyC"] = new(0x2E, false),
+            ["KeyD"] = new(0x20, false),
+            ["KeyE"] = new(0x12, false),
+            ["KeyF"] = new(0x21, false),
+            ["KeyN"] = new(0x31, false),
+            ["KeyR"] = new(0x13, false),
+            ["Digit1"] = new(0x02, false),
+            ["Digit2"] = new(0x03, false),
+            ["Digit3"] = new(0x04, false),
+            ["Digit4"] = new(0x05, false),
         };
 
     public static IReadOnlyList<WindowCandidate> ListWindows()
@@ -170,7 +170,7 @@ internal static class WindowsDesktop
 
     public static DeliveryResult TapKey(TargetIdentity binding, string code)
     {
-        if (!AllowedKeys.TryGetValue(code, out KeySpec key))
+        if (!TryResolveAllowedKey(code, out ValidatedKeyTap key))
         {
             throw new RequestException(
                 "KEY_NOT_ALLOWED",
@@ -184,8 +184,22 @@ internal static class WindowsDesktop
 
             return BackendDispatch.TapKey(
                 InputBackend,
-                new ValidatedKeyTap(key.VirtualKey, key.Extended));
+                key);
         }
+    }
+
+    internal static bool TryResolveAllowedKey(
+        string code,
+        out ValidatedKeyTap key)
+    {
+        if (AllowedKeys.TryGetValue(code, out KeySpec spec))
+        {
+            key = new ValidatedKeyTap(spec.ScanCode, spec.Extended);
+            return true;
+        }
+
+        key = default;
+        return false;
     }
 
     public static DeliveryResult SafeClick(
@@ -623,5 +637,5 @@ internal static class WindowsDesktop
 
     private readonly record struct VirtualDesktop(int X, int Y, int Width, int Height);
 
-    private readonly record struct KeySpec(ushort VirtualKey, bool Extended);
+    private readonly record struct KeySpec(ushort ScanCode, bool Extended);
 }

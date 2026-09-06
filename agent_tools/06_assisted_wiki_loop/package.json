@@ -1,0 +1,10 @@
+{
+  "name": "@atlas/assisted-wiki-loop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:core": "node scripts/verify-core.mjs",
+    "verify:model": "node scripts/verify-model.mjs"
+  }
+}

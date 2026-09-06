@@ -8,6 +8,7 @@ import {
   validateSignedEnvelopeShape,
 } from "../../packages/atlas_protocol/src/index.mjs";
 import { RunnerError } from "./errors.mjs";
+import { validateExplorationTrack, validityForExplorationTrack } from "./exploration-track.mjs";
 
 const OBSERVATION_KEYS = new Set(["frameRefs", "precedingActionRefs"]);
 
@@ -42,6 +43,7 @@ export class HandoffSealer {
     receiptChain,
     frames,
     inputGateway,
+    explorationTrack = "EXPLORATION",
   }) {
     if (!identityPool) throw new RunnerError("COORDINATOR_IDENTITY_REQUIRED", "HandoffSealer requires a Coordinator-issued identity pool.");
     this.internalRunId = internalRunId;
@@ -54,6 +56,7 @@ export class HandoffSealer {
     this.receiptChain = receiptChain;
     this.frames = frames;
     this.inputGateway = inputGateway;
+    this.explorationTrack = validateExplorationTrack(explorationTrack);
     this.publicRunId = identityPool.publicRunId;
     this.campaignId = identityPool.campaignId;
     this.targetRunId = identityPool.targetRunId;
@@ -83,6 +86,8 @@ export class HandoffSealer {
         || proof.privateFrameReceipt.header.targetRunId !== this.targetRunId
         || proof.signedServedEvent.header.campaignId !== this.campaignId
         || proof.signedServedEvent.header.targetRunId !== this.targetRunId
+        || proof.privateFrameReceipt.header.track !== this.explorationTrack
+        || proof.signedServedEvent.header.track !== this.explorationTrack
         || privatePayload.campaignId !== this.campaignId
         || servedPayload.campaignId !== this.campaignId
         || privatePayload.internalRunId !== this.internalRunId
@@ -118,12 +123,17 @@ export class HandoffSealer {
     frameIds = this.frames.servedFrameIds(),
     observations = [],
     status = "COMPLETE",
-    validity = "OFFICIAL",
+    validity,
     interventions = 0,
     framePolicyVersion = "canvas-served/v1",
     inputPolicyVersion = "keyboard-restricted/v1",
   } = {}) {
     if (this.sealed) throw new RunnerError("HANDOFF_ALREADY_SEALED", "A HandoffSealer instance can seal only once.");
+    const requiredValidity = validityForExplorationTrack(this.explorationTrack);
+    if (validity === undefined) validity = requiredValidity;
+    if (validity !== requiredValidity) {
+      throw new RunnerError("TRACK_VALIDITY_MISMATCH", "Handoff validity must match the signed exploration track.");
+    }
     const publicFrames = frameIds.map((frameId) => this.frames.getPublicFrame(frameId));
     this.#assertFrameProofs(publicFrames);
     const publicActions = this.inputGateway.publicActions();
@@ -207,7 +217,7 @@ export class HandoffSealer {
       schemaVersion: "atlas/public-play-handoff/1",
       artifactId: publicIdentity.artifactId,
       campaignId: this.campaignId,
-      track: "EXPLORATION",
+      track: this.explorationTrack,
       arm: "NONE",
       targetRunId: this.publicRunId,
       issuer: "atlas-player-runner",
@@ -238,7 +248,7 @@ export class HandoffSealer {
       schemaVersion: "atlas/private-judge-envelope/1",
       artifactId: privateIdentity.artifactId,
       campaignId: this.campaignId,
-      track: "EXPLORATION",
+      track: this.explorationTrack,
       arm: "NONE",
       targetRunId: this.targetRunId,
       issuer: "atlas-player-runner",

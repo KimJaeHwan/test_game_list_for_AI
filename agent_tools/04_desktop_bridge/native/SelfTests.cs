@@ -17,6 +17,8 @@ internal static class SelfTests
             ("uses half-open region containment", UsesHalfOpenRegionContainment),
             ("encodes deterministic PNG dimensions", EncodesDeterministicPng),
             ("routes validated values through fake backends once", RoutesValidatedValuesThroughFakeBackendsOnce),
+            ("preserves the key allowlist with explicit scan codes", PreservesKeyAllowlistWithScanCodes),
+            ("builds physical scan-code key down and up packets", BuildsPhysicalScanCodePackets),
             ("rejects invalid frame backend IDs without retry", RejectsInvalidFrameBackendIdsWithoutRetry),
             ("maps SendInput zero and partial counts conservatively", MapsSendInputCountsConservatively),
             ("maps fake backend failures without retry", MapsFakeBackendFailuresWithoutRetry),
@@ -175,7 +177,7 @@ internal static class SelfTests
             "fake-input",
             _ => new InputBackendResult(InputBackendOutcome.Delivered),
             _ => new InputBackendResult(InputBackendOutcome.Delivered));
-        var key = new ValidatedKeyTap(0x41, false);
+        var key = new ValidatedKeyTap(0x1E, false);
         DeliveryResult keyDelivery = BackendDispatch.TapKey(inputBackend, key);
         Assert(inputBackend.TapCalls == 1, "key backend must be called once");
         Assert(
@@ -196,6 +198,78 @@ internal static class SelfTests
         Assert(
             clickDelivery == new DeliveryResult(true, "fake-input"),
             "click delivery result mismatch");
+    }
+
+    private static void PreservesKeyAllowlistWithScanCodes()
+    {
+        var expected = new Dictionary<string, ValidatedKeyTap>(StringComparer.Ordinal)
+        {
+            ["ArrowUp"] = new(0x48, true),
+            ["ArrowDown"] = new(0x50, true),
+            ["ArrowLeft"] = new(0x4B, true),
+            ["ArrowRight"] = new(0x4D, true),
+            ["Enter"] = new(0x1C, false),
+            ["Tab"] = new(0x0F, false),
+            ["Space"] = new(0x39, false),
+            ["Shift"] = new(0x2A, false),
+            ["KeyA"] = new(0x1E, false),
+            ["KeyB"] = new(0x30, false),
+            ["KeyC"] = new(0x2E, false),
+            ["KeyD"] = new(0x20, false),
+            ["KeyE"] = new(0x12, false),
+            ["KeyF"] = new(0x21, false),
+            ["KeyN"] = new(0x31, false),
+            ["KeyR"] = new(0x13, false),
+            ["Digit1"] = new(0x02, false),
+            ["Digit2"] = new(0x03, false),
+            ["Digit3"] = new(0x04, false),
+            ["Digit4"] = new(0x05, false),
+        };
+
+        foreach ((string code, ValidatedKeyTap expectedTap) in expected)
+        {
+            Assert(
+                WindowsDesktop.TryResolveAllowedKey(code, out ValidatedKeyTap actualTap),
+                $"{code} must remain allowlisted");
+            Assert(actualTap == expectedTap, $"{code} scan-code mapping mismatch");
+        }
+
+        Assert(
+            !WindowsDesktop.TryResolveAllowedKey("Escape", out _),
+            "non-allowlisted keys must remain rejected");
+    }
+
+    private static void BuildsPhysicalScanCodePackets()
+    {
+        AssertScanCodePackets(new ValidatedKeyTap(0x1E, false));
+        AssertScanCodePackets(new ValidatedKeyTap(0x48, true));
+    }
+
+    private static void AssertScanCodePackets(ValidatedKeyTap key)
+    {
+        Input[] inputs = SendInputBackend.BuildKeyTapInputs(key);
+        Assert(inputs.Length == 2, "a key tap must contain exactly down and up");
+
+        uint downFlags = NativeMethods.KeyeventfScancode |
+            (key.Extended ? NativeMethods.KeyeventfExtendedKey : 0);
+        uint upFlags = downFlags | NativeMethods.KeyeventfKeyup;
+        AssertKeyboardInput(inputs[0], key.ScanCode, downFlags, "key down");
+        AssertKeyboardInput(inputs[1], key.ScanCode, upFlags, "key up");
+    }
+
+    private static void AssertKeyboardInput(
+        Input input,
+        ushort scanCode,
+        uint expectedFlags,
+        string phase)
+    {
+        KeyboardInput keyboard = input.Data.Keyboard;
+        Assert(input.Type == NativeMethods.InputKeyboard, $"{phase} type mismatch");
+        Assert(keyboard.VirtualKey == 0, $"{phase} wVk must be zero");
+        Assert(keyboard.ScanCode == scanCode, $"{phase} scan code mismatch");
+        Assert(keyboard.Flags == expectedFlags, $"{phase} flags mismatch");
+        Assert(keyboard.Time == 0, $"{phase} time must use the system default");
+        Assert(keyboard.ExtraInfo == 0, $"{phase} extra info must be zero");
     }
 
     private static void RejectsInvalidFrameBackendIdsWithoutRetry()
@@ -261,7 +335,7 @@ internal static class SelfTests
         AssertRequestCode(
             () => BackendDispatch.TapKey(
                 notDelivered,
-                new ValidatedKeyTap(0x41, false)),
+                new ValidatedKeyTap(0x1E, false)),
             "INPUT_NOT_DELIVERED");
         Assert(
             notDelivered.TapCalls == 1,
@@ -274,7 +348,7 @@ internal static class SelfTests
         AssertRequestCode(
             () => BackendDispatch.TapKey(
                 partial,
-                new ValidatedKeyTap(0x41, false)),
+                new ValidatedKeyTap(0x1E, false)),
             "DELIVERY_UNKNOWN");
         Assert(
             partial.TapCalls == 1,
@@ -287,7 +361,7 @@ internal static class SelfTests
         AssertRequestCode(
             () => BackendDispatch.TapKey(
                 throwing,
-                new ValidatedKeyTap(0x41, false)),
+                new ValidatedKeyTap(0x1E, false)),
             "DELIVERY_UNKNOWN");
         Assert(
             throwing.TapCalls == 1,

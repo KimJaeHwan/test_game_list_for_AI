@@ -26,7 +26,7 @@ internal readonly record struct ValidatedCaptureRegion(
     int Height);
 
 internal readonly record struct ValidatedKeyTap(
-    ushort VirtualKey,
+    ushort ScanCode,
     bool Extended);
 
 internal readonly record struct ValidatedMouseClick(

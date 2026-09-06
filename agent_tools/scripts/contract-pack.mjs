@@ -16,12 +16,14 @@ const MODULES = Object.freeze({
   runner: "01_player_runner",
   foundry: "02_wiki_foundry",
   judge: "03_replay_judge",
+  visionHost: "05_vision_agent_host",
+  assistedWikiLoop: "06_assisted_wiki_loop",
 });
 const COMMON_ROOT = "packages/atlas_protocol";
 const COMMON_FILES = new Set(["package.json", "CONTRACT_PACK.md"]);
 const COMMON_DIRS = ["src", "schemas", "fixtures"];
 const MODULE_FILES = new Set(["package.json", "CONTRACT_PACK.md"]);
-const MODULE_DIRS = ["src", "scripts", "fixtures"];
+const MODULE_DIRS = ["src", "scripts", "schemas", "fixtures"];
 
 function normalizePath(value) {
   return value.split(sep).join("/");
@@ -116,7 +118,7 @@ async function copySelected(sourceRoot, destinationRoot, paths, prefix, manifest
 
 export async function exportContractPack(moduleName, destinationInput) {
   const moduleDirectory = MODULES[moduleName];
-  if (!moduleDirectory) throw new Error("Unknown module. Use runner, foundry, or judge.");
+  if (!moduleDirectory) throw new Error("Unknown module. Use runner, foundry, judge, visionHost, or assistedWikiLoop.");
   const destination = resolve(destinationInput);
   ensureOutsideToolRoot(destination);
   await ensureEmptyDestination(destination);

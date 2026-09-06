@@ -13,6 +13,12 @@
     "test:desktop-target": "node --test 04_desktop_bridge/src/targeting/target-binding-broker.test.mjs",
     "test:desktop-input": "node --test 04_desktop_bridge/src/input/safe-input-broker.test.mjs",
     "test:desktop": "node 04_desktop_bridge/scripts/verify.mjs && node 04_desktop_bridge/scripts/verify-player-runner.mjs",
+    "test:vision-host": "node 05_vision_agent_host/scripts/verify.mjs",
+    "test:vision-integration": "node integration/vision_host/verify.mjs",
+    "test:wiki-core": "node 06_assisted_wiki_loop/scripts/verify-core.mjs",
+    "test:wiki-model": "node 06_assisted_wiki_loop/scripts/verify-model.mjs",
+    "test:wiki-loop": "node integration/assisted_wiki_loop/verify.mjs",
+    "test:checkpoint-campaign": "node 07_checkpoint_campaign/scripts/verify.mjs && node integration/checkpoint_campaign/verify.mjs",
     "verify:boundaries": "node scripts/verify-boundaries.mjs",
     "pack": "node scripts/export-contract-pack.mjs"
   }

@@ -37,6 +37,12 @@ if /I "%~1"=="desktop-runner" set "SCRIPT=04_desktop_bridge\scripts\verify-playe
 if /I "%~1"=="desktop-boundaries" set "SCRIPT=04_desktop_bridge\scripts\verify-boundaries.mjs"
 if /I "%~1"=="windows" set "SCRIPT=04_desktop_bridge\scripts\list-windows.mjs"
 if /I "%~1"=="live-window" set "SCRIPT=04_desktop_bridge\scripts\live-window-smoke.mjs"
+if /I "%~1"=="vision-host" set "SCRIPT=05_vision_agent_host\scripts\verify.mjs"
+if /I "%~1"=="vision-integration" set "SCRIPT=integration\vision_host\verify.mjs"
+if /I "%~1"=="wiki-core" set "SCRIPT=06_assisted_wiki_loop\scripts\verify-core.mjs"
+if /I "%~1"=="wiki-model" set "SCRIPT=06_assisted_wiki_loop\scripts\verify-model.mjs"
+if /I "%~1"=="wiki-loop" set "SCRIPT=integration\assisted_wiki_loop\verify.mjs"
+if /I "%~1"=="checkpoint-campaign" goto checkpoint_campaign
 if /I "%~1"=="pipeline" set "SCRIPT=integration\pipeline\verify.mjs"
 if /I "%~1"=="boundaries" set "SCRIPT=scripts\verify-boundaries.mjs"
 if /I "%~1"=="all" set "SCRIPT=scripts\test-all.mjs"
@@ -60,6 +66,16 @@ echo [Atlas] Running runner-core...
 if errorlevel 1 goto failed
 echo [Atlas] Running runner-service...
 "%NODE_EXE%" "01_player_runner\scripts\verify-service.mjs"
+if errorlevel 1 goto failed
+popd
+exit /b 0
+
+:checkpoint_campaign
+echo [Atlas] Running checkpoint-campaign core...
+"%NODE_EXE%" "07_checkpoint_campaign\scripts\verify.mjs"
+if errorlevel 1 goto failed
+echo [Atlas] Running checkpoint-campaign integration...
+"%NODE_EXE%" "integration\checkpoint_campaign\verify.mjs"
 if errorlevel 1 goto failed
 popd
 exit /b 0
@@ -90,6 +106,12 @@ echo   desktop-runner  Player Runner lifecycle over desktop adapter
 echo   desktop-boundaries Assigned module and native API boundaries
 echo   windows         List operator-selectable desktop windows
 echo   live-window     Real selected-window pixel and key smoke test
+echo   vision-host     Headless model, Runner transport and supervisor (no model call)
+echo   vision-integration Actual Runner stdio lifecycle with a fake model
+echo   wiki-core      Deterministic assisted Wiki merge and bounded context
+echo   wiki-model     Fresh Codex Wiki Agent port with fake processes only
+echo   wiki-loop      Play, seal, two Wiki revisions, and feedback with fake models
+echo   checkpoint-campaign Safe checkpoint, batched Wiki, sharding, and fresh-session continuation
 echo   pipeline        Runner to Foundry to Judge signed flow
 echo   boundaries      Contract Pack and module import boundaries
 echo   all             Every non-interactive test; excludes both live smoke tests

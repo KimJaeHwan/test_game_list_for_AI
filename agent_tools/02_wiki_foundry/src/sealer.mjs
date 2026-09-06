@@ -6,8 +6,10 @@ import {
   verifySignedEnvelope,
 } from "../../packages/atlas_protocol/src/index.mjs";
 import {
-  HEX_64, SAFE_ID, deepFreeze, fail, isObject,
+  HEX_64, deepFreeze, fail, isObject,
 } from "./core.mjs";
+
+const COORDINATOR_VALUE = /^(?:[A-Za-z0-9_-]{22}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
 
 const usedCoordinatorValues = new Set();
 
@@ -117,8 +119,8 @@ export function sealWikiBundle(input) {
       ["artifactId", "nonce"],
       `sealWikiBundle.allocations[${index}]`,
     );
-    if (!SAFE_ID.test(allocation.artifactId)
-      || !SAFE_ID.test(allocation.nonce)) {
+    if (!COORDINATOR_VALUE.test(allocation.artifactId)
+      || !COORDINATOR_VALUE.test(allocation.nonce)) {
       fail(`sealWikiBundle.allocations[${index}]: invalid coordinator value`);
     }
     coordinatorValues.push(allocation.artifactId, allocation.nonce);

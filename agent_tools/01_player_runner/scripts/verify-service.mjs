@@ -17,6 +17,7 @@ import {
   CoordinatorIdentityPool,
   FileArtifactStore,
   FileWalStore,
+  HandoffSealer,
   PlayerRunnerService,
   RunnerError,
   createPlayerRunnerToolDefinitions,
@@ -58,6 +59,7 @@ function createService(options = {}) {
     artifactStore: options.artifactStore,
     allowedKeys: ["Enter", "ArrowUp"],
     budgets: { observe: 30, keyboard: 10, object: 10, bookmark: 10, handoff: 2 },
+    explorationTrack: options.explorationTrack,
   });
   return { service, adapter, identities, privateKey: keys.privateKey, publicKey: keys.publicKey };
 }
@@ -67,6 +69,24 @@ function recursiveFiles(root) {
     const path = join(root, entry.name);
     return entry.isDirectory() ? recursiveFiles(path) : [path];
   });
+}
+
+function remapArtifactIds(artifacts, privateKey, publicArtifactId, privateArtifactId) {
+  const publicPayload = structuredClone(artifacts.publicHandoff.payload);
+  publicPayload.manifest.artifactId = publicArtifactId;
+  const { payloadDigest: _publicPayloadDigest, ...publicHeader } = artifacts.publicHandoff.header;
+  const publicHandoff = createSignedEnvelope({
+    ...publicHeader,
+    artifactId: publicArtifactId,
+  }, publicPayload, privateKey);
+
+  const { payloadDigest: _privatePayloadDigest, ...privateHeader } = artifacts.privateJudgeEnvelope.header;
+  const privateJudgeEnvelope = createSignedEnvelope({
+    ...privateHeader,
+    artifactId: privateArtifactId,
+    parentDigests: [sha256(publicHandoff)],
+  }, artifacts.privateJudgeEnvelope.payload, privateKey);
+  return { publicHandoff, privateJudgeEnvelope };
 }
 
 async function attach(service) {
@@ -180,6 +200,58 @@ async function verifyLifecycle() {
     (error) => expectRunnerError(error, "ARTIFACT_ALREADY_EXISTS"),
   );
 
+  const edgeIdStore = new FileArtifactStore({
+    publicRoot: join(temporaryRoot, "edge-id-public"),
+    privateRoot: join(temporaryRoot, "edge-id-private"),
+  });
+  const edgeIdPairs = [
+    [`-${"A".repeat(21)}`, `_${"B".repeat(21)}`],
+    [`_${"C".repeat(21)}`, `-${"D".repeat(21)}`],
+  ];
+  for (const [publicArtifactId, privateArtifactId] of edgeIdPairs) {
+    const remapped = remapArtifactIds(artifacts, privateKey, publicArtifactId, privateArtifactId);
+    assert.equal(validatePublicPlayHandoff(remapped.publicHandoff.payload).valid, true);
+    assert.equal(validateSignedEnvelopeShape(remapped.publicHandoff).valid, true);
+    assert.equal(validateSignedEnvelopeShape(remapped.privateJudgeEnvelope).valid, true);
+    assert.deepEqual(await edgeIdStore.persist({
+      ...remapped,
+      publicFiles: artifacts.publicFiles,
+    }), { persisted: true });
+    assert.equal(existsSync(join(edgeIdStore.publicRoot, publicArtifactId, "handoff.json")), true);
+    assert.equal(existsSync(join(edgeIdStore.privateRoot, privateArtifactId, "private-envelope.json")), true);
+  }
+
+  const validPublicArtifactId = `P${"A".repeat(21)}`;
+  const validPrivateArtifactId = `Q${"B".repeat(21)}`;
+  const invalidArtifactIdCases = [
+    { publicArtifactId: `../${"A".repeat(19)}`, privateArtifactId: validPrivateArtifactId },
+    { publicArtifactId: `..\\${"A".repeat(19)}`, privateArtifactId: validPrivateArtifactId },
+    { publicArtifactId: ".".repeat(22), privateArtifactId: validPrivateArtifactId },
+    { publicArtifactId: "A".repeat(21), privateArtifactId: validPrivateArtifactId },
+    { publicArtifactId: "A".repeat(23), privateArtifactId: validPrivateArtifactId },
+    { publicArtifactId: validPublicArtifactId, privateArtifactId: `../${"B".repeat(19)}` },
+  ];
+  for (const [index, ids] of invalidArtifactIdCases.entries()) {
+    const invalidPublicRoot = join(temporaryRoot, `invalid-id-${index}-public`);
+    const invalidPrivateRoot = join(temporaryRoot, `invalid-id-${index}-private`);
+    const invalidStore = new FileArtifactStore({
+      publicRoot: invalidPublicRoot,
+      privateRoot: invalidPrivateRoot,
+    });
+    const remapped = remapArtifactIds(
+      artifacts,
+      privateKey,
+      ids.publicArtifactId,
+      ids.privateArtifactId,
+    );
+    await assert.rejects(
+      invalidStore.persist({ ...remapped, publicFiles: artifacts.publicFiles }),
+      (error) => expectRunnerError(error, "ARTIFACT_ID_INVALID"),
+    );
+    assert.equal(existsSync(invalidPublicRoot), false);
+    assert.equal(existsSync(invalidPrivateRoot), false);
+  }
+
   const { payloadDigest: _payloadDigest, ...unsignedHeader } = artifacts.publicHandoff.header;
   const wrongSchemaHandoff = createSignedEnvelope({
     ...unsignedHeader,
@@ -232,6 +304,65 @@ async function verifyIdentityAndPersistenceFailClosed() {
   assert.equal(failingStore.calls, 1);
   assert.equal(service.stateMachine.state, "INVALID");
   assert.throws(() => service.getSealedArtifacts(), (error) => expectRunnerError(error, "HANDOFF_NOT_SEALED"));
+}
+
+async function verifyExplorationTrackProvenance() {
+  const defaultRun = createService();
+  const defaultAttached = await attach(defaultRun.service);
+  await defaultRun.service.observe({ observeCap: defaultAttached.observeCap });
+  assert.equal(
+    defaultRun.service.receiptChain.snapshot().every((entry) => entry.header.track === "EXPLORATION"),
+    true,
+    "default receipts must remain byte-compatible EXPLORATION artifacts",
+  );
+  await defaultRun.service.requestEnd({ handoffCap: defaultAttached.handoffCap, reason: "PARTIAL" });
+  await defaultRun.service.sealHandoff({ handoffCap: defaultAttached.handoffCap });
+  assert.equal(defaultRun.service.getSealedArtifacts().publicHandoff.payload.manifest.validity, "OFFICIAL");
+
+  const assistedRun = createService({ explorationTrack: "ASSISTED_EXPLORATION" });
+  const assistedAttached = await attach(assistedRun.service);
+  await assistedRun.service.observe({ observeCap: assistedAttached.observeCap });
+  await assistedRun.service.requestEnd({ handoffCap: assistedAttached.handoffCap, reason: "PARTIAL" });
+  await assistedRun.service.sealHandoff({ handoffCap: assistedAttached.handoffCap });
+  const assistedArtifacts = assistedRun.service.getSealedArtifacts();
+  assert.equal(
+    assistedRun.service.receiptChain.snapshot().every((entry) => entry.header.track === "ASSISTED_EXPLORATION"),
+    true,
+  );
+  assert.equal(assistedArtifacts.publicHandoff.header.track, "ASSISTED_EXPLORATION");
+  assert.equal(assistedArtifacts.privateJudgeEnvelope.header.track, "ASSISTED_EXPLORATION");
+  assert.equal(assistedArtifacts.publicHandoff.payload.manifest.validity, "ASSISTED");
+  assert.equal(verifySignedEnvelope(assistedArtifacts.publicHandoff, assistedRun.publicKey), true);
+  assert.equal(verifySignedEnvelope(assistedArtifacts.privateJudgeEnvelope, assistedRun.publicKey), true);
+
+  const mismatchedRun = createService({ explorationTrack: "ASSISTED_EXPLORATION" });
+  const mismatchedAttached = await attach(mismatchedRun.service);
+  await mismatchedRun.service.observe({ observeCap: mismatchedAttached.observeCap });
+  const mismatchedSealer = new HandoffSealer({
+    internalRunId: mismatchedRun.service.internalRunId,
+    configHandle: mismatchedRun.service.launchContext.configHandle,
+    gameBuildHandle: mismatchedRun.service.launchContext.gameBuildHandle,
+    replayAdapterVersion: mismatchedRun.service.launchContext.replayAdapterVersion,
+    runnerKeyId: mismatchedRun.service.runnerKeyId,
+    signingPrivateKey: mismatchedRun.privateKey,
+    identityPool: mismatchedRun.service.identityPool,
+    receiptChain: mismatchedRun.service.receiptChain,
+    frames: mismatchedRun.service.frames,
+    inputGateway: mismatchedRun.service.inputGateway,
+    explorationTrack: "ASSISTED_EXPLORATION",
+  });
+  assert.throws(
+    () => mismatchedSealer.seal({ validity: "OFFICIAL" }),
+    (error) => expectRunnerError(error, "TRACK_VALIDITY_MISMATCH"),
+  );
+
+  const adapter = new SyntheticTrustedAdapter();
+  assert.throws(
+    () => createService({ adapter, explorationTrack: "ASSISTED" }),
+    (error) => error instanceof TypeError && /explorationTrack/u.test(error.message),
+  );
+  assert.equal(adapter.launches.length, 0, "invalid track must be rejected before adapter launch");
+  assert.equal(adapter.inputSink.calls.length, 0, "invalid track must be rejected before adapter input");
 }
 
 async function verifyBadArgumentsBeforeAdapter() {
@@ -292,6 +423,57 @@ async function verifyStaleFrameAndCapability() {
     (error) => expectRunnerError(error, "CAPABILITY_DENIED"),
   );
   assert.equal(adapter.inputSink.calls.length, 0, "stale/capability failures must not dispatch input");
+}
+
+async function verifyWaitCaptureFailureBlocksAndCanSealPartial() {
+  const adapter = new SyntheticTrustedAdapter({ interactionTargets: [] });
+  const originalCapture = adapter.capture.bind(adapter);
+  adapter.capture = async (context) => {
+    if (context.purpose === "wait") throw new Error("synthetic outcome capture failure");
+    return originalCapture(context);
+  };
+  const { service } = createService({ adapter });
+  const attached = await attach(service);
+  const frame = await service.observe({ observeCap: attached.observeCap });
+  const receipt = await service.tapKey({
+    keyboardCap: attached.keyboardCap,
+    requestId: "capture-failure-request",
+    expectedFrameId: frame.frameId,
+    code: "Enter",
+  });
+  assert.equal(receipt.status, "DELIVERED");
+  await assert.rejects(
+    service.waitFrame({ observeCap: attached.observeCap, afterFrameId: frame.frameId, maxFrames: 5 }),
+    /synthetic outcome capture failure/u,
+  );
+  assert.equal(service.stateMachine.state, "BLOCKED");
+  assert.equal(adapter.inputSink.calls.length, 1, "capture failure must never retry delivered input");
+  await service.requestEnd({ handoffCap: attached.handoffCap, reason: "PARTIAL" });
+  const sealed = await service.sealHandoff({ handoffCap: attached.handoffCap });
+  assert.match(sealed.publicArtifactDigest, /^[a-f0-9]{64}$/u);
+  assert.equal(service.getSealedArtifacts().publicHandoff.payload.manifest.status, "PARTIAL");
+}
+
+async function verifyTrustedCleanupCanRetryAdapterEnd() {
+  const adapter = new SyntheticTrustedAdapter({ interactionTargets: [] });
+  const originalEnd = adapter.end.bind(adapter);
+  let attempts = 0;
+  adapter.end = async (context) => {
+    attempts += 1;
+    if (attempts === 1) throw new Error("synthetic first cleanup failure");
+    return originalEnd(context);
+  };
+  const { service } = createService({ adapter });
+  const attached = await attach(service);
+  await assert.rejects(
+    service.requestEnd({ handoffCap: attached.handoffCap, reason: "PARTIAL" }),
+    /synthetic first cleanup failure/u,
+  );
+  assert.equal(service.stateMachine.state, "ENDING");
+  assert.deepEqual(await service.closeTrusted(), { closed: true });
+  assert.equal(attempts, 2);
+  assert.equal(adapter.ends.length, 1);
+  assert.equal(adapter.ends[0].reason, "PARTIAL");
 }
 
 function assertNoForbiddenSchemaProperty(definitions) {
@@ -376,8 +558,11 @@ async function verifyJsonRpcTransport() {
 try {
   await verifyLifecycle();
   await verifyIdentityAndPersistenceFailClosed();
+  await verifyExplorationTrackProvenance();
   await verifyBadArgumentsBeforeAdapter();
   await verifyStaleFrameAndCapability();
+  await verifyWaitCaptureFailureBlocksAndCanSealPartial();
+  await verifyTrustedCleanupCanRetryAdapterEnd();
   await verifyJsonRpcTransport();
   console.log("Player Runner service verification passed");
   console.log(JSON.stringify({
@@ -393,6 +578,7 @@ try {
     artifactPersistence: "separate-atomic-no-overwrite",
     persistenceFailure: "invalid-fail-closed",
     explorationRunBinding: "targetRunId-equals-manifest-runId",
+    explorationTrackProvenance: "default-and-assisted-signed",
     handoffSchemaBinding: "payload-schema-header-required",
   }, null, 2));
 } finally {
